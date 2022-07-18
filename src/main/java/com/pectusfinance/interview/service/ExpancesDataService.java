@@ -5,5 +5,5 @@ import java.util.List;
 import com.pectusfinance.interview.dto.ExpansesDataDto;
 
 public interface ExpancesDataService {
-	public List<ExpansesDataDto> getAllExpansesData();
+	public List<ExpansesDataDto> getAllExpansesData(String filter);
 }

@@ -3,6 +3,8 @@ package com.pectusfinance.interview.serviceimpl;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -14,8 +16,53 @@ import com.pectusfinance.interview.service.ExpancesDataService;
 @Service
 public class ExpansesDataServiceImpl implements ExpancesDataService {
 
+	private static final String VALUE = "value";
+	private static final String DATE = "date";
+	private static final String MEMBER_NAME = "member_name";
+	private static final String AMOUNT = "amount";
+	private static final String PROJECT_NAME = "project_name";
+	private static final String CONDITION = "condition";
+	private static final String DEPARTMENTS = "departments";
+	private static final String FILED = "filed";
+	private static final String FIELD_AND_CONDITION_SPLITER = "__";
+	private static final String EQUALS = "equals";
+	private static final String NOT_EQUALS = "n_eq";
+	private static final String GT = "gt";
+	private static final String LT = "lt";
+	private static final String LT_EQ = "lt_eq";
+	private static final String GT_EQ = "gt_eq";
 	private static final String FILE_PATH = "expanses.csv";
+	
+	List<String> VALID_FILEDS = List.of(DEPARTMENTS, PROJECT_NAME, AMOUNT, MEMBER_NAME, DATE);
 
+	@Override
+	public List<ExpansesDataDto> getAllExpansesData(String filter) {
+		List<ExpansesDataDto> expansesData = null;
+		try {
+			List<String[]> data = readAllLines(Path.of(FILE_PATH));
+			data.remove(0);
+			expansesData = data.stream().map(ExpansesDataDto::new).toList();
+			for(HashMap<String, String> filterModel:getFiltersAndConditions(filter)) {
+				if(filterModel.get(FILED).equals(DEPARTMENTS)) {
+					expansesData = getFilteredDepartment(expansesData, filterModel);
+				}else if(filterModel.get(FILED).equals(PROJECT_NAME)) {
+					expansesData = getFilteredProject(expansesData, filterModel);
+				}else if(filterModel.get(FILED).equals(MEMBER_NAME)) {
+					expansesData = getFilteredMembers(expansesData, filterModel);
+				}else if(filterModel.get(FILED).equals(DATE)) {
+					expansesData = getFilteredDate(expansesData, filterModel);
+				}else if(filterModel.get(FILED).equals(AMOUNT)) {
+					expansesData = getFilteredAmount(expansesData, filterModel);
+				}else if(filterModel.get(FILED).equals("sort")) {
+					
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return expansesData;
+	}
+	
 	private List<String[]> readAllLines(Path filePath) throws Exception {
 		try (Reader reader = Files.newBufferedReader(filePath)) {
 			try (CSVReader csvReader = new CSVReader(reader)) {
@@ -24,15 +71,84 @@ public class ExpansesDataServiceImpl implements ExpancesDataService {
 		}
 	}
 
-	@Override
-	public List<ExpansesDataDto> getAllExpansesData() {
-		List<ExpansesDataDto> expansesData = null;
-		try {
-			List<String[]> data = readAllLines(Path.of(FILE_PATH));
-			data.remove(0);
-			expansesData = data.stream().map(ExpansesDataDto::new).toList();
-		} catch (Exception e) {
-			e.printStackTrace();
+	private List<HashMap<String, String>> getFiltersAndConditions(String filter) {
+
+		String[] filtersAndCondition = filter.strip().split("&");
+		List<HashMap<String, String>> filtes = new ArrayList<>();
+
+		for (String txt : filtersAndCondition) {
+
+			String[] fieldAndCondition = txt.split("=");
+			String filed = fieldAndCondition[0];
+			String value = fieldAndCondition[1];
+			String condition = EQUALS;
+			if (fieldAndCondition[0].contains(FIELD_AND_CONDITION_SPLITER)) {
+				condition = filed.split(FIELD_AND_CONDITION_SPLITER)[1];
+				filed = filed.split(FIELD_AND_CONDITION_SPLITER)[0];
+			}
+			if (VALID_FILEDS.contains(filed)) {
+				HashMap<String, String> filterMap = new HashMap<>();
+				filterMap.put(FILED, filed);
+				filterMap.put(CONDITION, condition);
+				filterMap.put(VALUE, value);
+				filtes.add(filterMap);
+			}
+		}
+		return filtes;
+	}
+
+	
+
+	private List<ExpansesDataDto> getFilteredAmount(List<ExpansesDataDto> expansesData, HashMap<String, String> filterModel) {
+		if(filterModel.get(CONDITION).equals(EQUALS)){
+			expansesData = expansesData.stream().filter(exData->exData.getAmount().equals(Double.valueOf(filterModel.get(VALUE)))).toList();
+		}else if(filterModel.get(CONDITION).equals(NOT_EQUALS)) {
+			expansesData = expansesData.stream().filter(exData->!exData.getAmount().equals(Double.valueOf(filterModel.get(VALUE)))).toList();
+		}else if(filterModel.get(CONDITION).equals(GT)) {
+			expansesData = expansesData.stream().filter(exData->exData.getAmount()>Double.valueOf(filterModel.get(VALUE))).toList();
+		}else if(filterModel.get(CONDITION).equals(LT)) {
+			expansesData = expansesData.stream().filter(exData->exData.getAmount()<Double.valueOf(filterModel.get(VALUE))).toList();
+		}else if(filterModel.get(CONDITION).equals(GT_EQ)) {
+			expansesData = expansesData.stream().filter(exData->exData.getAmount()>=Double.valueOf(filterModel.get(VALUE))).toList();
+		}else if(filterModel.get(CONDITION).equals(LT_EQ)) {
+			expansesData = expansesData.stream().filter(exData->exData.getAmount()<=Double.valueOf(filterModel.get(VALUE))).toList();
+		}
+		return expansesData;
+	}
+
+	private List<ExpansesDataDto> getFilteredDate(List<ExpansesDataDto> expansesData, HashMap<String, String> filterModel) {
+		if(filterModel.get(CONDITION).equals(EQUALS)){
+			expansesData = expansesData.stream().filter(exData->exData.getDate().equals(filterModel.get(VALUE))).toList();
+		}else if(filterModel.get(CONDITION).equals(NOT_EQUALS)) {
+			expansesData = expansesData.stream().filter(exData->!exData.getDate().equals(filterModel.get(VALUE))).toList();
+		}
+		return expansesData;
+	}
+
+	private List<ExpansesDataDto> getFilteredMembers(List<ExpansesDataDto> expansesData, HashMap<String, String> filterModel) {
+		if(filterModel.get(CONDITION).equals(EQUALS)){
+			expansesData = expansesData.stream().filter(exData->exData.getMemberName().equals(filterModel.get(VALUE))).toList();
+		}else if(filterModel.get(CONDITION).equals(NOT_EQUALS)) {
+			expansesData = expansesData.stream().filter(exData->!exData.getMemberName().equals(filterModel.get(VALUE))).toList();
+		}
+		return expansesData;
+	}
+
+	private List<ExpansesDataDto> getFilteredProject(List<ExpansesDataDto> expansesData, HashMap<String, String> filterModel) {
+		if(filterModel.get(CONDITION).equals(EQUALS)){
+			expansesData = expansesData.stream().filter(exData->exData.getProjectName().equals(filterModel.get(VALUE))).toList();
+		}else if(filterModel.get(CONDITION).equals(NOT_EQUALS)) {
+			expansesData = expansesData.stream().filter(exData->!exData.getProjectName().equals(filterModel.get(VALUE))).toList();
+		}
+		return expansesData;
+	}
+
+	private List<ExpansesDataDto> getFilteredDepartment(List<ExpansesDataDto> expansesData,
+			HashMap<String, String> filterModel) {
+		if(filterModel.get(CONDITION).equals(EQUALS)){
+			expansesData = expansesData.stream().filter(exData->exData.getDepartments().equals(filterModel.get(VALUE))).toList();
+		}else if(filterModel.get(CONDITION).equals(NOT_EQUALS)) {
+			expansesData = expansesData.stream().filter(exData->!exData.getDepartments().equals(filterModel.get(VALUE))).toList();
 		}
 		return expansesData;
 	}
